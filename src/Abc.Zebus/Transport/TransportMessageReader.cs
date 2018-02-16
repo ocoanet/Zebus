@@ -1,13 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 using Abc.Zebus.Serialization.Protobuf;
 using ProtoBuf;
+using Buffer = Abc.Zebus.Util.Buffer;
 
 namespace Abc.Zebus.Transport
 {
     internal static class TransportMessageReader
     {
+        // This class is used from a single thread
+        private static readonly Dictionary<Buffer, string> _strings = new Dictionary<Buffer, string>
+        {
+            { default, string.Empty }
+        };
+
         internal static TransportMessage ReadTransportMessage(this CodedInputStream input)
         {
             var transportMessage = new TransportMessage { Content = Stream.Null };
@@ -29,7 +37,7 @@ namespace Abc.Zebus.Transport
                         transportMessage.Originator = ReadOriginatorInfo(input);
                         break;
                     case 5:
-                        transportMessage.Environment = input.ReadString();
+                        transportMessage.Environment = ReadCachedString(input);
                         break;
                     case 6:
                         transportMessage.WasPersisted = input.ReadBool();
@@ -63,10 +71,10 @@ namespace Abc.Zebus.Transport
                         senderId = ReadPeerId(input);
                         break;
                     case 2:
-                        senderEndPoint = input.ReadString();
+                        senderEndPoint = ReadCachedString(input);
                         break;
                     case 5:
-                        initiatorUserName = input.ReadString();
+                        initiatorUserName = ReadCachedString(input);
                         break;
                     default:
                         SkipUnknown(input, wireType);
@@ -79,7 +87,7 @@ namespace Abc.Zebus.Transport
 
         private static PeerId ReadPeerId(CodedInputStream input)
         {
-            var value = ReadSingleField(input, x => x.ReadString());
+            var value = ReadSingleField(input, x => ReadCachedString(x));
             return new PeerId(value);
         }
 
@@ -91,7 +99,8 @@ namespace Abc.Zebus.Transport
 
         private static MessageTypeId ReadMessageTypeId(CodedInputStream input)
         {
-            var fullName = ReadSingleField(input, x => x.ReadString());
+            var fullName = ReadSingleField(input, x => ReadCachedString(x));
+            //var fullName = ReadSingleField(input, x => x.ReadString());
             return new MessageTypeId(fullName);
         }
 
@@ -101,6 +110,27 @@ namespace Abc.Zebus.Transport
             return new MemoryStream(input.ReadRawBytes(length));
         }
 
+        private static string ReadCachedString(CodedInputStream input) 
+            => GetCachedString(input.ReadBuffer());
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static string GetCachedString(in Buffer buffer)
+        {
+            if (_strings.TryGetValue(buffer, out var result))
+                return result;
+
+            return AddCachedString(in buffer);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static string AddCachedString(in Buffer buffer)
+        {
+            var result = CodedOutputStream.Utf8Encoding.GetString(buffer.Data, buffer.Offset, buffer.Length);
+            _strings[buffer.Copy()] = result;
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static T ReadSingleField<T>(CodedInputStream input, Func<CodedInputStream, T> read)
         {
             var length = input.ReadLength();
@@ -129,7 +159,7 @@ namespace Abc.Zebus.Transport
             if (peerIds == null)
                 peerIds = new List<PeerId>();
 
-            var value = ReadSingleField(input, x => x.ReadString());
+            var value = ReadSingleField(input, x => ReadCachedString(x));
             peerIds.Add(new PeerId(value));
 
             return peerIds;

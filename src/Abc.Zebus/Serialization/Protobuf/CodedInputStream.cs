@@ -33,7 +33,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 using ProtoBuf;
+using Buffer = Abc.Zebus.Util.Buffer;
 
 namespace Abc.Zebus.Serialization.Protobuf
 {
@@ -47,7 +49,7 @@ namespace Abc.Zebus.Serialization.Protobuf
     /// levels of protocol buffer format.
     /// </para>
     /// </remarks>
-    internal sealed class CodedInputStream
+    internal sealed unsafe class CodedInputStream
     {
         /// <summary>
         /// Buffer of data read from the stream or provided at construction time.
@@ -97,7 +99,11 @@ namespace Abc.Zebus.Serialization.Protobuf
         /// <summary>
         /// Returns the current position in the input stream, or the position in the input buffer
         /// </summary>
-        public long Position { get { return bufferPos; } }
+        public long Position
+        {
+            get => bufferPos;
+            set => bufferPos = (int)value;
+        }
 
         #region Reading of tags etc
 
@@ -124,6 +130,7 @@ namespace Abc.Zebus.Serialization.Protobuf
         /// for an embedded message, for example.
         /// </remarks>
         /// <returns>The next field tag, or 0 for end of stream. (0 is never a valid tag.)</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint ReadTag()
         {
             // Optimize for the incredibly common case of having at least one byte left in the buffer,
@@ -137,14 +144,16 @@ namespace Abc.Zebus.Serialization.Protobuf
                     if (tag == 0)
                     {
                         // If we actually read zero, that's not a valid tag.
-                        throw InvalidProtocolBufferException.InvalidTag();
+                        InvalidProtocolBufferException.ThrowInvalidTag();
                     }
                     return tag;
                 }
             }
+
             return ReadTagSlow();
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private uint ReadTagSlow()
         {
             if (IsAtEnd)
@@ -156,7 +165,7 @@ namespace Abc.Zebus.Serialization.Protobuf
             if (tag == 0)
             {
                 // If we actually read zero, that's not a valid tag.
-                throw InvalidProtocolBufferException.InvalidTag();
+                InvalidProtocolBufferException.ThrowInvalidTag();
             }
 
             return tag;
@@ -245,22 +254,31 @@ namespace Abc.Zebus.Serialization.Protobuf
         /// </summary>
         public string ReadString()
         {
-            int length = ReadLength();
+            var length = ReadLength();
+
             // No need to read any data for an empty string.
             if (length == 0)
-            {
                 return "";
-            }
+
             if (length > bufferSize - bufferPos)
-            {
-                throw InvalidProtocolBufferException.TruncatedMessage();
-            }
+                InvalidProtocolBufferException.ThrowTruncatedMessage();
 
             // Fast path:  We already have the bytes in a contiguous buffer, so
             //   just copy directly from it.
             var result = CodedOutputStream.Utf8Encoding.GetString(buffer, bufferPos, length);
             bufferPos += length;
             return result;
+        }
+
+        public Buffer ReadBuffer()
+        {
+            var length = ReadLength();
+            if (length > bufferSize - bufferPos)
+                InvalidProtocolBufferException.ThrowTruncatedMessage();
+
+            var pos = bufferPos;
+            bufferPos += length;
+            return new Buffer(buffer, pos, length);
         }
 
         public void SkipString()
@@ -396,7 +414,8 @@ namespace Abc.Zebus.Serialization.Protobuf
                                     return (uint) result;
                                 }
                             }
-                            throw InvalidProtocolBufferException.MalformedVarint();
+                            
+                            InvalidProtocolBufferException.ThrowMalformedVarint();
                         }
                     }
                 }
@@ -458,7 +477,7 @@ namespace Abc.Zebus.Serialization.Protobuf
                                     return (uint) result;
                                 }
                             }
-                            throw InvalidProtocolBufferException.MalformedVarint();
+                            InvalidProtocolBufferException.ThrowMalformedVarint();
                         }
                     }
                 }
@@ -484,7 +503,7 @@ namespace Abc.Zebus.Serialization.Protobuf
                 int b = input.ReadByte();
                 if (b == -1)
                 {
-                    throw InvalidProtocolBufferException.TruncatedMessage();
+                    InvalidProtocolBufferException.ThrowTruncatedMessage();
                 }
                 result |= (b & 0x7f) << offset;
                 if ((b & 0x80) == 0)
@@ -498,7 +517,7 @@ namespace Abc.Zebus.Serialization.Protobuf
                 int b = input.ReadByte();
                 if (b == -1)
                 {
-                    throw InvalidProtocolBufferException.TruncatedMessage();
+                    InvalidProtocolBufferException.ThrowTruncatedMessage();
                 }
                 if ((b & 0x80) == 0)
                 {
@@ -525,7 +544,9 @@ namespace Abc.Zebus.Serialization.Protobuf
                 }
                 shift += 7;
             }
-            throw InvalidProtocolBufferException.MalformedVarint();
+            
+            InvalidProtocolBufferException.ThrowMalformedVarint();
+            return default;
         }
 
         /// <summary>
@@ -608,7 +629,7 @@ namespace Abc.Zebus.Serialization.Protobuf
         {
             if (bufferPos == bufferSize)
             {
-                throw InvalidProtocolBufferException.TruncatedMessage();
+                InvalidProtocolBufferException.ThrowTruncatedMessage();
             }
             return buffer[bufferPos++];
         }
@@ -622,18 +643,18 @@ namespace Abc.Zebus.Serialization.Protobuf
         internal byte[] ReadRawBytes(int size)
         {
             if (size < 0)
-            {
-                throw InvalidProtocolBufferException.NegativeSize();
-            }
+                InvalidProtocolBufferException.ThrowNegativeSize();
 
             if (size > bufferSize - bufferPos)
-            {
-                throw InvalidProtocolBufferException.TruncatedMessage();
-            }
+                InvalidProtocolBufferException.ThrowTruncatedMessage();
 
             // We have all the bytes we need already.
-            byte[] bytes = new byte[size];
-            ByteArray.Copy(buffer, bufferPos, bytes, 0, size);
+            var bytes = new byte[size];
+            fixed (byte* pDest = bytes, pSrc = buffer)
+            {
+                Buffer.Copy(pDest, pSrc + bufferPos, size);
+            }
+            
             bufferPos += size;
             return bytes;
         }

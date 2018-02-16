@@ -32,6 +32,7 @@
 
 using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace Abc.Zebus.Serialization.Protobuf
 {
@@ -57,6 +58,10 @@ namespace Abc.Zebus.Serialization.Protobuf
                 "Completed reading a message while more data was available in the stream.");
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static void ThrowTruncatedMessage()
+            => throw TruncatedMessage();
+
         internal static InvalidProtocolBufferException TruncatedMessage()
         {
             return new InvalidProtocolBufferException(
@@ -66,6 +71,10 @@ namespace Abc.Zebus.Serialization.Protobuf
                 "misreported its own length.");
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static void ThrowNegativeSize()
+            => throw NegativeSize();
+
         internal static InvalidProtocolBufferException NegativeSize()
         {
             return new InvalidProtocolBufferException(
@@ -73,11 +82,19 @@ namespace Abc.Zebus.Serialization.Protobuf
                 "which claimed to have negative size.");
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static void ThrowMalformedVarint()
+            => throw MalformedVarint();
+
         internal static InvalidProtocolBufferException MalformedVarint()
         {
             return new InvalidProtocolBufferException(
                 "CodedInputStream encountered a malformed varint.");
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static void ThrowInvalidTag()
+            => throw InvalidTag();
 
         /// <summary>
         /// Creates an exception for an error condition of an invalid tag being encountered.
