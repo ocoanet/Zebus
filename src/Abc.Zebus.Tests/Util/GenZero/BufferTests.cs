@@ -7,113 +7,108 @@ using Buffer = Abc.Zebus.Util.Buffer;
 namespace Abc.Zebus.Tests.Util.GenZero
 {
     [TestFixture]
-    public class BufferTests
+    public unsafe class BufferTests
     {
         [Test]
-        public void should_copy_from_buffer()
+        public void should_compare_buffer_equality_1()
         {
-            var src = new Buffer(new byte[] { 0, 1, 2, 3, 4 });
-            var dest = new Buffer(10);
+            var bufA = new Buffer(new byte[] { 42, 1, 2, 3, 4, 5 });
+            var bufB = new Buffer(new byte[] { 42, 1, 2, 3, 4, 5 });
 
-            dest.CopyFrom(ref src);
-
-            dest.Length.ShouldEqual(src.Length);
-            dest.Data.Take(dest.Length).ShouldEqual(src.Data.Take(src.Length));
+            CompareBuffersAndHashCodes(bufA, bufB).ShouldBeTrue();
         }
 
         [Test]
-        public void should_copy_from_byte_array()
+        public void should_compare_buffer_equality_2()
         {
-            var buffer = new Buffer(10);
-            var bytes = new byte[] { 0, 1, 2, 3, 4 };
+            var bufA = new Buffer(new byte[] { 42, 1, 2, 3, 4, 5 });
+            var bufB = new Buffer(new byte[] { 42, 1, 2, 30, 4, 5 });
 
-            buffer.CopyFrom(bytes);
-
-            buffer.Length.ShouldEqual(bytes.Length);
-            buffer.Data.Take(buffer.Length).ShouldEqual(bytes);
+            CompareBuffersAndHashCodes(bufA, bufB).ShouldBeFalse();
         }
 
         [Test]
-        public void should_copy_to_buffer()
+        public void should_compare_buffer_equality_3()
         {
-            var src = new Buffer(new byte[] { 0, 1, 2, 3, 4 });
-            var dest = new Buffer(10);
+            var data = new byte[] { 42, 1, 2, 3, 4, 5 };
+            var buf = new Buffer(data, 0, 4);
 
-            src.CopyTo(ref dest);
+            CompareBuffersAndHashCodes(buf, new Buffer(data, 0, 4)).ShouldBeTrue();
+            CompareBuffersAndHashCodes(buf, new Buffer(data, 0, 3)).ShouldBeFalse();
+            CompareBuffersAndHashCodes(buf, new Buffer(data, 1, 4)).ShouldBeFalse();
+            CompareBuffersAndHashCodes(buf, new Buffer()).ShouldBeFalse();
+            CompareBuffersAndHashCodes(new Buffer(data, 0, 0), new Buffer()).ShouldBeFalse();
+            CompareBuffersAndHashCodes(new Buffer(data, 3, 0), new Buffer()).ShouldBeFalse();
+        }
 
-            dest.Length.ShouldEqual(src.Length);
-            dest.Data.Take(dest.Length).ShouldEqual(src.Data.Take(src.Length));
+        private static bool CompareBuffersAndHashCodes(Buffer a, Buffer b)
+            => a.Equals(b) & a.GetHashCode() == b.GetHashCode();
+
+        [Test]
+        public void should_copy_buffer()
+        {
+            var data = new byte[] { 42, 1, 2, 3, 4, 5 };
+            var buf = new Buffer(data, 0, 4);
+            var bufCopy = buf.Copy();
+
+            CompareBuffersAndHashCodes(buf, bufCopy).ShouldBeTrue();
+            CompareBuffersAndHashCodes(bufCopy, new Buffer(new byte[] { 42, 1, 2, 3 })).ShouldBeTrue();
+
+            data[1] = 10;
+            
+            CompareBuffersAndHashCodes(buf, bufCopy).ShouldBeFalse();
+            CompareBuffersAndHashCodes(bufCopy, new Buffer(new byte[] { 42, 1, 2, 3 })).ShouldBeTrue();
         }
 
         [Test]
-        public void should_throw_when_assigned_length_is_greater_than_the_available_byte_count()
+        public void should_copy_buffers_for_all_lengths([Range(0, 1024)] int length)
         {
-            var buffer = new Buffer(new byte[] { 0, 1, 2, 3, 4 });
+            var buffer1 = new byte[1024];
+            var buffer2 = new byte[1024];
 
-            Assert.DoesNotThrow(() => buffer.Length = 2);
-            Assert.DoesNotThrow(() => buffer.Length = 5);
-            Assert.Throws<ArgumentOutOfRangeException>(() => buffer.Length = 10);
+            var random = new Random();
+            random.NextBytes(buffer1);
+
+            fixed (byte* b1 = buffer1)
+            fixed (byte* b2 = buffer2)
+            {
+                Buffer.Copy(b2, b1, length);
+            }
+
+            buffer2.Take(length).SequenceEqual(buffer1.Take(length)).ShouldBeTrue();
+            buffer2.Skip(length).Where(x => x != 0).ShouldBeEmpty();
         }
 
         [Test]
-        public void should_throw_when_assigned_negative_length()
+        public void should_compare_buffers_for_all_lengths([Range(0, 1024)] int length)
         {
-            var buffer = new Buffer(new byte[] { 0, 1, 2, 3, 4 });
+            var buffer1 = new byte[length];
+            var buffer2 = new byte[length];
 
-            Assert.Throws<ArgumentOutOfRangeException>(() => buffer.Length = -1);
-        }
+            var random = new Random();
+            random.NextBytes(buffer1);
 
-        [Test]
-        public void should_only_take_length_bytes_into_account_for_hashcode()
-        {
-            var b1 = new Buffer(new byte[] { 0, 1, 2, 3, 4 });
-            var b2 = new Buffer(new byte[] { 0, 1 });
+            for (var i = 0; i < length; ++i)
+                buffer2[i] = buffer1[i];
 
-            b1.Length = 2;
+            unchecked
+            {
+                fixed (byte* b1 = buffer1)
+                fixed (byte* b2 = buffer2)
+                {
+                    Buffer.Equals(b1, b2, length).ShouldBeTrue();
 
-            b1.GetHashCode().ShouldEqual(b2.GetHashCode());
-        }
+                    if (length == 0)
+                        return;
 
-        [Test]
-        public void should_throw_when_destination_buffer_is_too_small()
-        {
-            var src = new Buffer(new byte[] { 0, 1, 2, 3, 4 });
-            var dest = new Buffer(2);
-
-            Assert.Throws<ArgumentException>(() => src.CopyTo(ref dest));
-        }
-
-        [Test]
-        public void should_to_byte_array_return_correct_bytes()
-        {
-            var byteArray = new byte[] { 0, 1, 2, 3, 4 };
-            var buffer = new Buffer(byteArray);
-
-            var otherByteArray = buffer.ToByteArray();
-
-            otherByteArray.ShouldEqual(byteArray);
-        }
-
-        [Test]
-        public void should_two_equal_buffers_have_the_same_hashcode()
-        {
-            var b1 = new Buffer(new byte[] { 0, 1, 2, 3, 4 });
-            var b2 = new Buffer(new byte[] { 0, 1, 2, 3, 4 });
-
-            b1.GetHashCode().ShouldEqual(b2.GetHashCode());
-        }
-
-
-        [Test]
-        public void should_copy_from_byte_array_with_offset_and_length()
-        {
-            var buffer = new Buffer(10);
-            var bytes = new byte[] { 0, 1, 2, 3, 4 };
-
-            buffer.CopyFrom(bytes, 2, 1);
-
-            buffer.Length.ShouldEqual(1);
-            buffer.Data.Take(buffer.Length).ShouldEqual(new byte[] { 2 });
+                    for (var i = 0; i < length; ++i)
+                    {
+                        ++buffer2[i];
+                        Buffer.Equals(b1, b2, length).ShouldBeFalse();
+                        --buffer2[i];
+                    }
+                }
+            }
         }
     }
 }
