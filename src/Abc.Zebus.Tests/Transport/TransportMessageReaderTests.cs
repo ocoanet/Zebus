@@ -106,7 +106,7 @@ namespace Abc.Zebus.Tests.Transport
 
             var inputStream = new CodedInputStream(outputStream.Buffer, 0, outputStream.Position);
             inputStream.ReadTransportMessage();
-
+            
             const int count = 100_000_000;
             using (Measure.Throughput(count))
             {

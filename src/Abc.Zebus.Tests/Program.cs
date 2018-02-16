@@ -6,8 +6,10 @@ using Abc.Zebus.Dispatch;
 using Abc.Zebus.Routing;
 using Abc.Zebus.Scan;
 using Abc.Zebus.Testing;
+using Abc.Zebus.Tests.Benchmarks;
 using Abc.Zebus.Tests.Core;
 using Abc.Zebus.Util;
+using BenchmarkDotNet.Running;
 using ProtoBuf;
 
 namespace Abc.Zebus.Tests
@@ -44,10 +46,10 @@ namespace Abc.Zebus.Tests
                 return;
             }
 
-            var test = new BusPerformanceTests();
-            test.MeasureEventThroughputWithoutPersistence();
+            //var test = new BusPerformanceTests();
+            //test.MeasureEventThroughputWithoutPersistence();
 
-            Console.ReadKey();
+            BenchmarkRunner.Run<TransportMessageReaderBench>();
         }
 
         private static void RunLocalDispatch()

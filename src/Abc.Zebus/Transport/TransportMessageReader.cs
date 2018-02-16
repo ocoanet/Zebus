@@ -87,20 +87,19 @@ namespace Abc.Zebus.Transport
 
         private static PeerId ReadPeerId(CodedInputStream input)
         {
-            var value = ReadSingleField(input, x => ReadCachedString(x));
+            var value = ReadSingleFieldString(input);
             return new PeerId(value);
         }
 
         private static MessageId ReadMessageId(CodedInputStream input)
         {
-            var guid = ReadSingleField(input, x => x.ReadGuid());
+            var guid = ReadSingleFieldGuid(input);
             return new MessageId(guid);
         }
 
         private static MessageTypeId ReadMessageTypeId(CodedInputStream input)
         {
-            var fullName = ReadSingleField(input, x => ReadCachedString(x));
-            //var fullName = ReadSingleField(input, x => x.ReadString());
+            var fullName = ReadSingleFieldCachedString(input);
             return new MessageTypeId(fullName);
         }
 
@@ -110,7 +109,7 @@ namespace Abc.Zebus.Transport
             return new MemoryStream(input.ReadRawBytes(length));
         }
 
-        private static string ReadCachedString(CodedInputStream input) 
+        private static string ReadCachedString(CodedInputStream input)
             => GetCachedString(input.ReadBuffer());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -131,19 +130,67 @@ namespace Abc.Zebus.Transport
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static T ReadSingleField<T>(CodedInputStream input, Func<CodedInputStream, T> read)
+        private static string ReadSingleFieldString(CodedInputStream input)
         {
             var length = input.ReadLength();
             var endPosition = input.Position + length;
 
-            var value = default(T);
+            string value = null;
 
             while (input.Position < endPosition && input.TryReadTag(out var number, out var wireType))
             {
                 switch (number)
                 {
                     case 1:
-                        value = read.Invoke(input);
+                        value = input.ReadString();
+                        break;
+                    default:
+                        SkipUnknown(input, wireType);
+                        break;
+                }
+            }
+
+            return value;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static string ReadSingleFieldCachedString(CodedInputStream input)
+        {
+            var length = input.ReadLength();
+            var endPosition = input.Position + length;
+
+            string value = null;
+
+            while (input.Position < endPosition && input.TryReadTag(out var number, out var wireType))
+            {
+                switch (number)
+                {
+                    case 1:
+                        value = ReadCachedString(input);
+                        break;
+                    default:
+                        SkipUnknown(input, wireType);
+                        break;
+                }
+            }
+
+            return value;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Guid ReadSingleFieldGuid(CodedInputStream input)
+        {
+            var length = input.ReadLength();
+            var endPosition = input.Position + length;
+
+            Guid value = default;
+
+            while (input.Position < endPosition && input.TryReadTag(out var number, out var wireType))
+            {
+                switch (number)
+                {
+                    case 1:
+                        value = input.ReadGuid();
                         break;
                     default:
                         SkipUnknown(input, wireType);
@@ -159,7 +206,7 @@ namespace Abc.Zebus.Transport
             if (peerIds == null)
                 peerIds = new List<PeerId>();
 
-            var value = ReadSingleField(input, x => ReadCachedString(x));
+            var value = ReadSingleFieldCachedString(input);
             peerIds.Add(new PeerId(value));
 
             return peerIds;

@@ -575,8 +575,7 @@ namespace Abc.Zebus.Serialization.Protobuf
 
             stream.Position = 0;
 
-            var memoryStream = stream as MemoryStream;
-            if (memoryStream != null)
+            if (stream is MemoryStream memoryStream)
                 position += memoryStream.Read(buffer, position, length);
             else
                 WriteRawStreamSlow(stream);

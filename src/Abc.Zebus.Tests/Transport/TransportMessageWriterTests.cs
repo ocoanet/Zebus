@@ -138,7 +138,7 @@ namespace Abc.Zebus.Tests.Transport
 
             stream.WriteTransportMessage(transportMessage);
 
-            const int count = 10 * 1000 * 1000;
+            const int count = 100_000_000;
             using (Measure.Throughput(count))
             {
                 for (var i = 0; i < count; i++)
