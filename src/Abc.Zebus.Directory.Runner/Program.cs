@@ -10,6 +10,9 @@ using Abc.Zebus.Directory.DeadPeerDetection;
 using Abc.Zebus.Directory.Initialization;
 using Abc.Zebus.Directory.Storage;
 using Abc.Zebus.Dispatch;
+using Abc.Zebus.Nng.Transport;
+using Abc.Zebus.Persistence;
+using Abc.Zebus.Transport;
 using Abc.Zebus.Util;
 using log4net;
 using log4net.Config;
@@ -78,6 +81,15 @@ namespace Abc.Zebus.Directory.Runner
 
                     return dispatcher;
                 });
+
+                if (ConfigurationManager.AppSettings["Transport"] == "Nng")
+                {
+                    c.ForSingletonOf<IPersistentTransport>().Use<PersistentTransport>().Ctor<ITransport>().Is<NngTransport>();
+                    c.For<INngTransportConfiguration>().Use(new NngTransportConfiguration
+                    {
+                        InboundEndPoint = ConfigurationManager.AppSettings["Endpoint"],
+                    });
+                }
 
                 // Cassandra specific
                 if (useCassandraStorage)

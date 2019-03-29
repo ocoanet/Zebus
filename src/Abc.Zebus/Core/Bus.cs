@@ -122,6 +122,7 @@ namespace Abc.Zebus.Core
             }
             catch
             {
+                Status = BusStatus.Stopping;
                 InternalStop(registered);
                 Status = BusStatus.Stopped;
                 throw;
@@ -176,8 +177,6 @@ namespace Abc.Zebus.Core
 
         private void InternalStop(bool unregister)
         {
-            Status = BusStatus.Stopping;
-
             if (unregister)
             {
                 try

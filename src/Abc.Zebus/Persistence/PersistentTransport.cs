@@ -147,9 +147,7 @@ namespace Abc.Zebus.Persistence
                 return;
 
             if (_messagesWaitingForPersistence.Any())
-            {
                 _logger.WarnFormat("Stopping PersistenceTransport with messages waiting for persistence to come back online!");
-            }
 
             _innerTransport.Stop();
 

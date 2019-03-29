@@ -29,3 +29,6 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("Abc.Zebus.Persistence.CQL.Tests")]
 [assembly: InternalsVisibleTo("Abc.Zebus.Persistence.RocksDb")]
 [assembly: InternalsVisibleTo("Abc.Zebus.Persistence.RocksDb.Tests")]
+
+[assembly: InternalsVisibleTo("Abc.Zebus.Nng")]
+[assembly: InternalsVisibleTo("Abc.Zebus.Nng.Tests")]

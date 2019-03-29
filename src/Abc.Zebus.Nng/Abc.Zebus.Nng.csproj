@@ -1,0 +1,56 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>Zebus.Nng</PackageId>
+    <Version>$(ZebusVersion)</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Abc.Zebus\Abc.Zebus.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" /> <!-- T4 -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Transport\NngNative.Generated.cs">
+      <DependentUpon>NngNative.Generated.tt</DependentUpon>
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Transport\NngNative.Generated.tt">
+      <LastGenOutput>NngNative.Generated.cs</LastGenOutput>
+      <Generator>TextTemplatingFileGenerator</Generator>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\lib\nng\Abc.Zebus.libnng.x64.dll">
+      <PackagePath>runtimes\win-x64\native\Abc.Zebus.libnng.dll</PackagePath>
+    </None>
+    <None Include="..\..\lib\nng\Abc.Zebus.libnng.x86.dll">
+      <PackagePath>runtimes\win-x86\native\Abc.Zebus.libnng.dll</PackagePath>
+    </None>
+    <None Update="..\..\lib\nng\Abc.Zebus.libnng.*">
+      <Link>%(FileName)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Pack>True</Pack>
+      <Visible>false</Visible>
+    </None>
+    <None Update="Zebus.targets">
+      <Pack>true</Pack>
+      <PackagePath>build</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Abc.Zebus.Nng.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>
